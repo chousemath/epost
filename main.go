@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -51,7 +52,7 @@ var regKey = os.Getenv("EPOST_REG_KEY")
 
 const baseURL = "http://biz.epost.go.kr/KpostPortal/openapi"
 
-func (e ePostRequest) getPostalCodes() error {
+func (e ePostRequest) getPostalCodes() (*ePostResult, error) {
 	var bufs bytes.Buffer
 
 	wr := transform.NewWriter(&bufs, korean.EUCKR.NewEncoder())
@@ -73,7 +74,7 @@ func (e ePostRequest) getPostalCodes() error {
 		e.CurrentPage,
 	))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer res.Body.Close()
 
@@ -82,30 +83,31 @@ func (e ePostRequest) getPostalCodes() error {
 	epRes := new(ePostResult)
 	err = xml.Unmarshal(data, epRes)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	return epRes, nil
+}
+
+func main() {
+	epReq := ePostRequest{
+		Query:        "뒷골2로 47-20",
+		CountPerPage: 50,
+		CurrentPage:  1,
+	}
+	epRes, err := epReq.getPostalCodes()
+	if err != nil {
+		log.Fatal(err)
+	}
 	fmt.Println("TotalCount:", epRes.PageInfo.TotalCount)
 	fmt.Println("TotalPage:", epRes.PageInfo.TotalPage)
 	fmt.Println("CountPerPage:", epRes.PageInfo.CountPerPage)
 	fmt.Println("CurrentPage:", epRes.PageInfo.CurrentPage)
 
 	for _, itm := range epRes.ItemList.Items {
+		fmt.Println("======================")
 		fmt.Println("PostalCode:", itm.PostalCode)
 		fmt.Println("Address:", itm.Address)
 		fmt.Println("AddressJibun:", itm.AddressJibun)
-	}
-
-	return nil
-}
-
-func main() {
-	e := ePostRequest{
-		Query:        "뒷골2로 47-20",
-		CountPerPage: 50,
-		CurrentPage:  1,
-	}
-	if err := e.getPostalCodes(); err != nil {
-		fmt.Println(err)
 	}
 }
